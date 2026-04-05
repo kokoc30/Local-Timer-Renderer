@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Local Timer Renderer</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=JetBrains+Mono:wght@700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header>
+        <div class="logo">
+            <span class="icon">⏱️</span>
+            <h1>Local Timer Renderer</h1>
+        </div>
+        <div id="system-status-indicator" class="status-badge offline">
+            Backend: <span id="status-text">Disconnected</span>
+        </div>
+    </header>
+
+    <main class="app-layout">
+        <aside class="settings-sidebar">
+            <h2>Timer Settings</h2>
+            <form id="timer-settings-form">
+                <div class="form-group">
+                    <label for="start-time">Start Time</label>
+                    <input type="text" id="start-time" name="start-time" value="60:00" placeholder="HH:MM:SS or MM:SS">
+                </div>
+
+                <div class="form-group">
+                    <label for="display-format">Display Format</label>
+                    <select id="display-format" name="display-format">
+                        <option value="MM:SS" selected>MM:SS</option>
+                        <option value="HH:MM:SS">HH:MM:SS</option>
+                        <option value="M:SS">M:SS</option>
+                        <option value="H:MM:SS">H:MM:SS</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="preview-speed">Preview Playback Speed</label>
+                    <select id="preview-speed" name="preview-speed">
+                        <option value="1">1x (Real Time)</option>
+                        <option value="2">2x</option>
+                        <option value="4">4x</option>
+                        <option value="10" selected>10x</option>
+                        <option value="20">20x</option>
+                        <option value="50">50x</option>
+                        <option value="100">100x</option>
+                        <option value="custom">Custom</option>
+                    </select>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="resolution">Resolution</label>
+                        <select id="resolution" name="resolution">
+                            <option value="1920x1080" selected>1920x1080 (1080p)</option>
+                            <option value="1280x720">1280x720 (720p)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="fps">FPS</label>
+                        <select id="fps" name="fps">
+                            <option value="60" selected>60</option>
+                            <option value="30">30</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="style-preset">Style Preset</label>
+                    <select id="style-preset" name="style-preset">
+                        <option value="minimal-digital">Minimal Digital</option>
+                        <option value="watch-frame" selected>Watch Frame</option>
+                        <option value="bold-center">Bold Center</option>
+                        <option value="thin-modern">Thin Modern</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="encoder-preference">Encoder Preference</label>
+                    <select id="encoder-preference" name="encoder-preference">
+                        <option value="auto" selected>Auto Detection</option>
+                        <option value="gpu">GPU (NVIDIA NVENC)</option>
+                        <option value="cpu">CPU (libx264)</option>
+                    </select>
+                </div>
+
+                <button type="button" id="render-btn" class="primary-btn pulse">Start Frame Render</button>
+            </form>
+            <!-- System Readiness Diagnostics -->
+            <div id="readiness-panel" class="panel-section readiness-section">
+                <div class="panel-header-row">
+                    <h3>Export Readiness</h3>
+                    <button id="refresh-diagnostics-btn" class="btn-icon-small" title="Refresh Diagnostics">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"></path><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+                    </button>
+                </div>
+                
+                <div class="readiness-summary">
+                    <div class="readiness-item" id="ffmpeg-status-item">
+                        <span class="dot"></span>
+                        <span class="label">FFmpeg</span>
+                        <span class="value">--</span>
+                    </div>
+                    <div class="readiness-item" id="nvenc-status-item">
+                        <span class="dot"></span>
+                        <span class="label">NVIDIA GPU</span>
+                        <span class="value">--</span>
+                    </div>
+                </div>
+
+                <div class="recommendation-box" id="readiness-recommendation">
+                    <span class="icon">ℹ️</span>
+                    <span class="text">Analyzing system capabilities...</span>
+                </div>
+
+                <details class="diagnostics-details">
+                    <summary>View Details</summary>
+                    <div class="details-content">
+                        <div class="detail-row">
+                            <span class="key">Endpoint:</span>
+                            <span class="val" id="diag-ffmpeg-path">--</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="key">Version:</span>
+                            <span class="val" id="diag-ffmpeg-version">--</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="key">Encoders:</span>
+                            <span class="val" id="diag-encoders-list">--</span>
+                        </div>
+                    </div>
+                </details>
+            </div>
+        </aside>
+
+        <section class="main-stage">
+            <div id="view-planning" class="stage-view active-view">
+                <div class="preview-container">
+                    <div class="preview-header">
+                        <h3>Visual Preview</h3>
+                        <div class="preview-info">16:9 • 1920x1080</div>
+                    </div>
+                    <div id="preview-viewport" class="canvas-shadow">
+                        <canvas id="preview-canvas"></canvas>
+                        
+                        <div id="preview-controls-overlay" class="controls-overlay">
+                            <div class="playback-bar-container">
+                                <input type="range" id="preview-seek" min="0" max="100" value="0" step="0.001">
+                            </div>
+                            <div class="controls-toolbar">
+                                <div class="btn-group main-controls">
+                                    <button type="button" id="preview-play-pause" title="Play/Pause"><span>▶</span></button>
+                                    <button type="button" id="preview-reset" title="Reset"><span>🔄</span></button>
+                                </div>
+                                
+                                <div class="btn-group jump-controls">
+                                    <button type="button" id="jump-start" class="btn-small">Start</button>
+                                    <button type="button" id="jump-mid" class="btn-small">Mid</button>
+                                    <button type="button" id="jump-end" class="btn-small">End</button>
+                                </div>
+
+                                <div class="playback-info">
+                                    <span id="preview-time-info">-- / --</span>
+                                    <span class="separator">|</span>
+                                    <span id="preview-frame-info">Frame: --</span>
+                                    <span class="separator">|</span>
+                                    <span id="preview-progress-percent">0%</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel-section status-panel" style="margin-top: 1.5rem;">
+                    <h3>Render Planning</h3>
+                    <div id="render-plan-details" class="plan-details-grid">
+                        <div class="plan-item">
+                            <span class="label">Display Duration:</span>
+                            <span id="plan-display-duration" class="value">--</span>
+                        </div>
+                        <div class="plan-item">
+                            <span class="label">Video Duration:</span>
+                            <span id="plan-output-duration" class="value">--</span>
+                        </div>
+                        <div class="plan-item">
+                            <span class="label">Total Frames:</span>
+                            <span id="plan-total-frames" class="value">--</span>
+                        </div>
+                        <div class="plan-item">
+                            <span class="label">FPS:</span>
+                            <span id="plan-fps" class="value">--</span>
+                        </div>
+                    </div>
+                    <div id="render-plan-summary" class="plan-summary-line">
+                        Ready to plan. Enter settings to begin.
+                    </div>
+                </div>
+            </div>
+
+            <div id="view-progress" class="stage-view">
+                <div class="panel-section progress-panel">
+                    <h3>Job Orchestration</h3>
+                    <div class="job-status-hero">
+                        <div id="hero-spinner" class="spinner pulse-circle"></div>
+                        <h2 id="hero-status-message">Initializing...</h2>
+                    </div>
+                    <div id="render-status-container" style="margin-top: 2rem; border-top: 1px solid var(--border); padding-top: 1.5rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.5rem;">
+                            <strong id="render-status-message">Working...</strong>
+                            <span id="render-status-badge" class="status-badge" style="background: var(--bg-alt); padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.75rem; text-transform: uppercase;">Idle</span>
+                        </div>
+                        <div class="progress-bar-container" style="height: 12px; background: var(--bg-darker); border-radius: 6px; overflow: hidden; margin-bottom: 0.5rem; border: 1px solid var(--border);">
+                            <div id="progress-bar" class="progress-bar-fill" style="height: 100%; width: 0%; background: var(--accent); transition: width 0.3s ease;"></div>
+                        </div>
+                        <div class="progress-labels" style="display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--text-light);">
+                            <span id="progress-percent">0%</span>
+                            <span id="progress-frames">0 / 0 frames</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="view-results" class="stage-view">
+                <div class="panel-section results-panel">
+                    <div class="results-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <h3>Final Render Result</h3>
+                        <button type="button" id="btn-new-render" class="btn-small" style="background: var(--bg-dark); border-color: var(--border);">+ New Render</button>
+                    </div>
+                    
+                    <div class="video-player-container" style="background: #000; border-radius: 8px; overflow: hidden; border: 1px solid var(--border); box-shadow: 0 10px 30px rgba(0,0,0,0.5); aspect-ratio: 16/9;">
+                        <video id="result-video-player" controls preload="metadata" style="width: 100%; height: 100%; display: block;" muted>
+                            Your browser does not support the video tag.
+                        </video>
+                    </div>
+
+                    <div class="results-actions" style="margin-top: 1.5rem; display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <a id="btn-download-mp4" href="#" download class="primary-btn" style="text-align: center; text-decoration: none; display: flex; align-items: center; justify-content: center; gap: 0.5rem; margin-top: 0;">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                            Download MP4
+                        </a>
+                        <button type="button" id="btn-copy-path" class="primary-btn" style="background-color: var(--bg-dark); border: 1px solid var(--border); color: var(--text-main); margin-top: 0; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                            Copy Local Path
+                        </button>
+                    </div>
+
+                    <div id="results-technical-details" class="plan-details-grid" style="margin-top: 1.5rem">
+                        <div class="plan-item">
+                            <span class="label">Job ID:</span>
+                            <span id="res-job-id" class="value" style="font-size: 0.75rem;">--</span>
+                        </div>
+                        <div class="plan-item">
+                            <span class="label">Encoder Used:</span>
+                            <span id="res-encoder" class="value">--</span>
+                        </div>
+                        <div class="plan-item">
+                            <span class="label">File Size:</span>
+                            <span id="res-size" class="value">--</span>
+                        </div>
+                        <div class="plan-item">
+                            <span class="label">Export Time:</span>
+                            <span id="res-time" class="value">--</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="history-panel" style="margin-top: auto; padding-top: 2rem;">
+                <h3 style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-muted); margin-bottom: 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem;">Session Job History</h3>
+                <div id="history-list" class="history-list">
+                    <div class="empty-history" style="font-size: 0.85rem; color: var(--text-muted);">No jobs run in this session.</div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <p>&copy; 2026 Local Timer Renderer • Version 0.1.0 • Built with FastAPI & Vanilla JS</p>
+    </footer>
+
+    <script type="module" src="app.js"></script>
+</body>
+</html>
