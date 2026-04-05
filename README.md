@@ -72,3 +72,6 @@ When you click "Start Frame Render", the app follows these steps:
 - **Execution Policy**: If Windows blocks the `.ps1` script, you might need to run `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass` in your terminal first.
 
 For more technical details, you can look at the files in the [docs/](docs/) folder.
+
+## Author
+Made by Koko Jamgotchian
